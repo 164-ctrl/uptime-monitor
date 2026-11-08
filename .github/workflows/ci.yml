@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Create the .env file
+        run: echo "POSTGRES_PASSWORD=ci-test-password" > .env
+
+      - name: Start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the app
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS http://localhost:8000/health && break
+            sleep 3
+          done
+
+      - name: Test the database route
+        run: curl -fsS http://localhost:8000/visits
+
+      - name: Show logs if something failed
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop everything
+        if: always()
+        run: docker compose down -v
